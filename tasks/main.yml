@@ -115,8 +115,15 @@
 
 - name: Create list of instance ids for canary
   set_fact:
-    canary_instance_list: "{{ canary_instance_list | default([]) + [ item.instance_id] "
+    canary_instance_list: "{{ canary_instance_list | default([]) + [ item.instance_id ] }}"
   with_items: "{{ canary_instances.instances }}"
+
+- name: Pick random one if canary and canary instance is empty
+  set_fact:
+    canary_instance_list: "{{ instance_list[0:1] }}"
+  when:
+    - canary
+    - canary_instance_list|length <= 0
 
 - name: Canary release instance ids
   set_fact:
