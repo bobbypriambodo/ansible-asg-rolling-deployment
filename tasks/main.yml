@@ -113,6 +113,10 @@
       "tag:Canary": "true"
   register: canary_instances
 
+- name: Initialize canary_instance_list
+  set_fact:
+    canary_instance_list: []
+
 - name: Create list of instance ids for canary
   set_fact:
     canary_instance_list: "{{ canary_instance_list | default([]) + [ item.instance_id ] }}"
@@ -135,37 +139,9 @@
     release_instance_ids: "{{ instance_list|difference(canary_instance_list) }}"
   when: not canary
 
-- name: Debug
+- name: Show release instance ids
   debug:
     msg: "{{ release_instance_ids }}"
-
-
-# - name: Current instance ids in ASG
-#   debug:
-#     msg: "{{ instance_list }}"
-#     verbosity: 3
-#   when:
-#     - instance_list|length > 0
-
-# Might need to check if canary exists; if not, create. Else, mark for replace.
-# - name: Check for instances selected manually to be replaced
-#   fail:
-#     msg: "Cannot find instance id {{ item }} in asg {{ asg_name }}"
-#   with_items: "{{ canary_release_instance_ids }}"
-#   when:
-#     - canary_release_instance_ids|length > 0
-#     - item not in instance_list
-
-# - name: Random Instance Ids that will be replaced in canary release
-#   set_fact:
-#     canary_release_instance_ids: "{{ instance_list[0:canary_release_count] }}"
-#   when:
-#     - canary_release_count > 0
-
-# - name: Canary release instance ids that will be updated with new AMI
-#   debug:
-#     msg: "{{ canary_release_instance_ids }}"
-#     verbosity: 3
 
 ### UPDATE ASG TAGS
 
