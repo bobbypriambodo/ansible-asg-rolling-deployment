@@ -79,26 +79,6 @@
     - replace_new_instances != true
     - old_lc.launch_configurations[0].image_id != ami_id
 
-### CREATE NEW LC
-
-# - name: State the Launch Configuration
-#   ec2_lc:
-#     region: "{{ aws_region }}"
-#     name: "{{ new_lc_name }}"
-#     image_id: "{{ ami.images[0].image_id }}"
-#     instance_type: "{{ instance_type | default(old_lc.launch_configurations[0].instance_type) }}"
-#     instance_profile_name: "{{ old_lc.launch_configurations[0].iam_instance_profile }}"
-#     key_name: "{{ old_lc.launch_configurations[0].key_name | default(omit, true) }}"
-#     security_groups: "{{ old_lc.launch_configurations[0].security_groups }}"
-#     user_data: "{{ instance_user_data }}"
-#     instance_monitoring: "{{ old_lc.launch_configurations[0].instance_monitoring.enabled }}"
-#     ebs_optimized: "{{ old_lc.launch_configurations[0].ebs_optimized }}"
-#     volumes:
-#       - device_name: "{{ ebs_device_name }}"
-#         volume_size: "{{ ebs_volume_size }}"
-#         volume_type: "{{ ebs_volume_type }}"
-#         delete_on_termination: "{{ ebs_delete_on_termination }}"
-
 ### GET INSTANCES THAT NEED TO BE UPDATED
 
 - name: Create list of instance ids in current ASG
@@ -139,10 +119,6 @@
     release_instance_ids: "{{ instance_list|difference(canary_instance_list) }}"
   when: not canary
 
-- name: Show release instance ids
-  debug:
-    msg: "{{ release_instance_ids }}"
-
 ### UPDATE ASG TAGS
 
 - name: Set ASG tags list to empty array.
@@ -164,7 +140,6 @@
   with_items:
     - { key: "AmiId", value: "{{ ami_id }}" }
     - { key: "ManagedBy", value: "ansible" }
-    - { key: "Canary", value: "{{ canary }}" }
 
 - name: Update canary tags
   set_fact:
@@ -178,24 +153,44 @@
     msg: "{{ asg_tags }}"
     verbosity: 3
 
+### CREATE NEW LC
+
+- name: State the Launch Configuration
+  ec2_lc:
+    region: "{{ aws_region }}"
+    name: "{{ new_lc_name }}"
+    image_id: "{{ ami.images[0].image_id }}"
+    instance_type: "{{ instance_type | default(old_lc.launch_configurations[0].instance_type) }}"
+    instance_profile_name: "{{ old_lc.launch_configurations[0].iam_instance_profile }}"
+    key_name: "{{ old_lc.launch_configurations[0].key_name | default(omit, true) }}"
+    security_groups: "{{ old_lc.launch_configurations[0].security_groups }}"
+    user_data: "{{ instance_user_data }}"
+    instance_monitoring: "{{ old_lc.launch_configurations[0].instance_monitoring.enabled }}"
+    ebs_optimized: "{{ old_lc.launch_configurations[0].ebs_optimized }}"
+    volumes:
+      - device_name: "{{ ebs_device_name }}"
+        volume_size: "{{ ebs_volume_size }}"
+        volume_type: "{{ ebs_volume_type }}"
+        delete_on_termination: "{{ ebs_delete_on_termination }}"
+
 ### UPDATE ASG
 
-# - name: Canary update the ASG
-#   ec2_asg:
-#     region: "{{ aws_region }}"
-#     default_cooldown: "{{ asg_default_cooldown }}"
-#     name: "{{ asg_name }}"
-#     launch_config_name: "{{ new_lc_name }}"
-#     max_size: "{{ asg_max_size | default(asg.results[0].max_size) }}"
-#     min_size: "{{ asg_min_size | default(asg.results[0].min_size) }}"
-#     desired_capacity: "{{ asg_desired_capacity | default(asg.results[0].desired_capacity) }}"
-#     health_check_type: "{{ asg_health_check_type | default(asg.results[0].health_check_type) }}"
-#     health_check_period: "{{ asg_health_check_grace_period | default(asg.results[0].health_check_grace_period) }}"
-#     replace_instances: "{{ instance_ids }}"
-#     replace_batch_size: "{{ asg_replace_batch_size | default(omit) }}"
-#     wait_for_instances: "{{ asg_wait_for_instances }}"
-#     wait_timeout: "{{ asg_wait_timeout }}"
-#     tags: "{{ asg_tags }}"
+- name: Canary update the ASG
+  ec2_asg:
+    region: "{{ aws_region }}"
+    default_cooldown: "{{ asg_default_cooldown }}"
+    name: "{{ asg_name }}"
+    launch_config_name: "{{ new_lc_name }}"
+    max_size: "{{ asg_max_size | default(asg.results[0].max_size) }}"
+    min_size: "{{ asg_min_size | default(asg.results[0].min_size) }}"
+    desired_capacity: "{{ asg_desired_capacity | default(asg.results[0].desired_capacity) }}"
+    health_check_type: "{{ asg_health_check_type | default(asg.results[0].health_check_type) }}"
+    health_check_period: "{{ asg_health_check_grace_period | default(asg.results[0].health_check_grace_period) }}"
+    replace_instances: "{{ release_instance_ids }}"
+    replace_batch_size: "{{ asg_replace_batch_size | default(omit) }}"
+    wait_for_instances: "{{ asg_wait_for_instances }}"
+    wait_timeout: "{{ asg_wait_timeout }}"
+    tags: "{{ asg_tags }}"
 
 ### CLEANUP OLD LAUNCH CONFIGURATIONS
 
