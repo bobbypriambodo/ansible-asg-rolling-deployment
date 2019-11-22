@@ -97,6 +97,8 @@
   debug:
     msg: "{{ instance_list }}"
     verbosity: 3
+  when:
+    - instance_list|length > 0
 
 # Might need to check if canary exists; if not, create. Else, mark for replace.
 # - name: Check for instances selected manually to be replaced
