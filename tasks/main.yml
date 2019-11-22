@@ -180,6 +180,7 @@
   when:
     - item.key != "AmiId"
     - item.key != "ManagedBy"
+    - item.key != "Canary"
 
 - name: Update deployment related tags
   set_fact:
@@ -188,6 +189,13 @@
     - { key: "AmiId", value: "{{ ami_id }}" }
     - { key: "ManagedBy", value: "ansible" }
     - { key: "Canary", value: "{{ canary }}" }
+
+- name: Update canary tags
+  set_fact:
+    asg_tags: "{{ asg_tags | default([]) + [ { item.key: item.value } ] }}"
+  with_items:
+    - { key: "Canary", value: "true" }
+  when: canary
 
 - name: The Final tags to be updated to ASG
   debug:
