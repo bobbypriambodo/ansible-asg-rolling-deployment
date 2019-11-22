@@ -84,21 +84,23 @@
 #     msg: "{{ all_lc }}"
 #     verbosity: 3
 
-- name: Create list of instances in current ASG
-  set_fact:
-    instance_list: "{{ instance_list | default([]) + [ item.instance_id ] }}"
-  with_items: "{{ asg.results[0].instances }}"
-
 - name: Debug ASG
   debug:
     msg: "{{ asg.results[0].instances }}"
 
-- name: Current instance ids in ASG
-  debug:
-    msg: "{{ instance_list }}"
-    verbosity: 3
-  when:
-    - instance_list|length > 0
+# - name: Create list of instances in current ASG
+#   set_fact:
+#     instance_list: "{{ instance_list | default([]) + [ item.instance_id ] }}"
+#   with_items: "{{ asg.results[0].instances }}"
+#   when:
+#     - asg.results[0].instances
+
+# - name: Current instance ids in ASG
+#   debug:
+#     msg: "{{ instance_list }}"
+#     verbosity: 3
+#   when:
+#     - instance_list|length > 0
 
 # Might need to check if canary exists; if not, create. Else, mark for replace.
 # - name: Check for instances selected manually to be replaced
