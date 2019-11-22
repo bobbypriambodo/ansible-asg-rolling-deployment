@@ -101,7 +101,7 @@
 
 ### GET INSTANCES THAT NEED TO BE UPDATED
 
-- name: Create list of instances in current ASG
+- name: Create list of instance ids in current ASG
   set_fact:
     instance_list: "{{ instance_list | default([]) + [ item.instance_id ] }}"
   with_items: "{{ asg.results[0].instances }}"
@@ -113,10 +113,25 @@
       "tag:Canary": "true"
   register: canary_instances
 
+- name: Create list of instance ids for canary
+  set_fact:
+    canary_instance_list: "{{ canary_instance_list | default([]) + [ item.instance_id] "
+  with_items: "{{ canary_instances.instances }}"
+
+- name: Canary release instance ids
+  set_fact:
+    release_instance_ids: "{{ canary_instance_list }}"
+  when: canary
+
+- name: Non-canary release instance ids
+  set_fact:
+    release_instance_ids: "{{ instance_list|difference(canary_instance_list) }}"
+  when: not canary
+
 - name: Debug
   debug:
-    msg: "{{ canary_instances }}"
-    verbosity: 3
+    msg: "{{ release_instance_ids }}"
+
 
 # - name: Current instance ids in ASG
 #   debug:
