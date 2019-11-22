@@ -4,19 +4,6 @@
     msg: "Detected ansible version is {{ ansible_version.full }}, please use ansible v2.5.x"
   when: ansible_version.full is version('2.5.15', '>') or ansible_version.full is version('2.5.0', '<')
 
-- name: Check if invalid canary release
-  fail:
-    msg: "Got `canary_release_instance_ids` and `canary_release_count` both set. Please use only 1 parameter at a time for canary release."
-  when:
-    - canary_release_instance_ids|length > 0
-    - canary_release_count > 0
-
-- name: Set replace_new_instance to true for canary release
-  set_fact:
-    replace_new_instances: true
-  when:
-    - canary_release_instance_ids|length > 0 or canary_release_count > 0
-
 - name: Get the AMI
   ec2_ami_facts:
     region: "{{ aws_region }}"
@@ -86,85 +73,69 @@
     - replace_new_instances != true
     - old_lc.launch_configurations[0].image_id != ami_id
 
-- name: Find all launch configuration for service
-  ec2_lc_find:
-    region: "{{ aws_region }}"
-    name_regex: "{{service_name }}-{{ cluster_role }}-*"
-  register: all_lc
+# - name: Find all launch configuration for service
+#   ec2_lc_find:
+#     region: "{{ aws_region }}"
+#     name_regex: "{{service_name }}-{{ cluster_role }}-*"
+#   register: all_lc
 
-- name: All found LC for a service
-  debug:
-    msg: "{{ all_lc }}"
-    verbosity: 3
-
-- name: Fail If the ASG instance count less than automatic canary release count
-  fail:
-    msg: "Got {{ asg.results[0].instances|length }} instance, expected greater than {{ canary_release_count }}. Please check `asg_name` parameter."
-  when:
-    - canary_release_count > 0
-    - asg.results[0].instances|length <= canary_release_count
-
-- name: Fail If the ASG instance count equals manual canary release count
-  fail:
-    msg: "Got {{ asg.results[0].instances|length }} instance in asg, and manual `canary_release_instance_ids` length also same. Canary release should not replace all instances."
-  when:
-    - canary_release_instance_ids|length > 0
-    - asg.results[0].instances|length == canary_release_instance_ids|length
-
+# - name: All found LC for a service
+#   debug:
+#     msg: "{{ all_lc }}"
+#     verbosity: 3
 
 - name: Create list of instances in current ASG
   set_fact:
     instance_list: "{{ instance_list | default([]) + [ item.instance_id ] }}"
   with_items: "{{ asg.results[0].instances }}"
-  when:
-    - canary_release_count > 0 or canary_release_instance_ids|length > 0
+
+- name: Debug ASG
+  debug:
+    msg: "{{ asg.results[0].instances }}"
 
 - name: Current instance ids in ASG
   debug:
     msg: "{{ instance_list }}"
     verbosity: 3
-  when:
-    - canary_release_count > 0 or canary_release_instance_ids|length > 0
 
-- name: Check for instances selected manually to be replaced
-  fail:
-    msg: "Cannot find instance id {{ item }} in asg {{ asg_name }}"
-  with_items: "{{ canary_release_instance_ids }}"
-  when:
-    - canary_release_instance_ids|length > 0
-    - item not in instance_list
+# Might need to check if canary exists; if not, create. Else, mark for replace.
+# - name: Check for instances selected manually to be replaced
+#   fail:
+#     msg: "Cannot find instance id {{ item }} in asg {{ asg_name }}"
+#   with_items: "{{ canary_release_instance_ids }}"
+#   when:
+#     - canary_release_instance_ids|length > 0
+#     - item not in instance_list
 
-- name: Random Instance Ids that will be replaced in canary release
-  set_fact:
-    canary_release_instance_ids: "{{ instance_list[0:canary_release_count] }}"
-  when:
-    - canary_release_count > 0
+# - name: Random Instance Ids that will be replaced in canary release
+#   set_fact:
+#     canary_release_instance_ids: "{{ instance_list[0:canary_release_count] }}"
+#   when:
+#     - canary_release_count > 0
 
-- name: Canary release instance ids that will be updated with new AMI
-  debug:
-    msg: "{{ canary_release_instance_ids }}"
-    verbosity: 3
-  when:
-    - canary_release_instance_ids|length > 0
+# - name: Canary release instance ids that will be updated with new AMI
+#   debug:
+#     msg: "{{ canary_release_instance_ids }}"
+#     verbosity: 3
 
 
-- name: State the Launch Configuration
-  ec2_lc:
-    region: "{{ aws_region }}"
-    name: "{{ new_lc_name }}"
-    image_id: "{{ ami.images[0].image_id }}"
-    instance_type: "{{ instance_type | default(old_lc.launch_configurations[0].instance_type) }}"
-    instance_profile_name: "{{ old_lc.launch_configurations[0].iam_instance_profile }}"
-    key_name: "{{ old_lc.launch_configurations[0].key_name | default(omit, true) }}"
-    security_groups: "{{ old_lc.launch_configurations[0].security_groups }}"
-    user_data: "{{ instance_user_data }}"
-    instance_monitoring: "{{ old_lc.launch_configurations[0].instance_monitoring.enabled }}"
-    ebs_optimized: "{{ old_lc.launch_configurations[0].ebs_optimized }}"
-    volumes:
-      - device_name: "{{ ebs_device_name }}"
-        volume_size: "{{ ebs_volume_size }}"
-        volume_type: "{{ ebs_volume_type }}"
-        delete_on_termination: "{{ ebs_delete_on_termination }}"
+# - name: State the Launch Configuration
+#   ec2_lc:
+#     region: "{{ aws_region }}"
+#     name: "{{ new_lc_name }}"
+#     image_id: "{{ ami.images[0].image_id }}"
+#     instance_type: "{{ instance_type | default(old_lc.launch_configurations[0].instance_type) }}"
+#     instance_profile_name: "{{ old_lc.launch_configurations[0].iam_instance_profile }}"
+#     key_name: "{{ old_lc.launch_configurations[0].key_name | default(omit, true) }}"
+#     security_groups: "{{ old_lc.launch_configurations[0].security_groups }}"
+#     user_data: "{{ instance_user_data }}"
+#     instance_monitoring: "{{ old_lc.launch_configurations[0].instance_monitoring.enabled }}"
+#     ebs_optimized: "{{ old_lc.launch_configurations[0].ebs_optimized }}"
+#     volumes:
+#       - device_name: "{{ ebs_device_name }}"
+#         volume_size: "{{ ebs_volume_size }}"
+#         volume_type: "{{ ebs_volume_type }}"
+#         delete_on_termination: "{{ ebs_delete_on_termination }}"
 
 - name: Set ASG tags list to empty array.
   set_fact:
@@ -190,64 +161,64 @@
     msg: "{{ asg_tags }}"
     verbosity: 3
 
-- name: Canary update the ASG
-  ec2_asg:
-    region: "{{ aws_region }}"
-    default_cooldown: "{{ asg_default_cooldown }}"
-    name: "{{ asg_name }}"
-    launch_config_name: "{{ new_lc_name }}"
-    max_size: "{{ asg_max_size | default(asg.results[0].max_size) }}"
-    min_size: "{{ asg_min_size | default(asg.results[0].min_size) }}"
-    desired_capacity: "{{ asg_desired_capacity | default(asg.results[0].desired_capacity) }}"
-    health_check_type: "{{ asg_health_check_type | default(asg.results[0].health_check_type) }}"
-    health_check_period: "{{ asg_health_check_grace_period | default(asg.results[0].health_check_grace_period) }}"
-    replace_instances: "{{ canary_release_instance_ids }}"
-    wait_for_instances: "{{ asg_wait_for_instances }}"
-    wait_timeout: "{{ asg_wait_timeout }}"
-    tags: "{{ asg_tags }}"
-  when:
-    - canary_release_instance_ids|length > 0
+# - name: Canary update the ASG
+#   ec2_asg:
+#     region: "{{ aws_region }}"
+#     default_cooldown: "{{ asg_default_cooldown }}"
+#     name: "{{ asg_name }}"
+#     launch_config_name: "{{ new_lc_name }}"
+#     max_size: "{{ asg_max_size | default(asg.results[0].max_size) }}"
+#     min_size: "{{ asg_min_size | default(asg.results[0].min_size) }}"
+#     desired_capacity: "{{ asg_desired_capacity | default(asg.results[0].desired_capacity) }}"
+#     health_check_type: "{{ asg_health_check_type | default(asg.results[0].health_check_type) }}"
+#     health_check_period: "{{ asg_health_check_grace_period | default(asg.results[0].health_check_grace_period) }}"
+#     replace_instances: "{{ canary_release_instance_ids }}"
+#     wait_for_instances: "{{ asg_wait_for_instances }}"
+#     wait_timeout: "{{ asg_wait_timeout }}"
+#     tags: "{{ asg_tags }}"
+#   when:
+#     - canary_release_instance_ids|length > 0
 
-- name: Update full ASG
-  ec2_asg:
-    region: "{{ aws_region }}"
-    default_cooldown: "{{ asg_default_cooldown }}"
-    name: "{{ asg_name }}"
-    launch_config_name: "{{ new_lc_name }}"
-    max_size: "{{ asg_max_size | default(asg.results[0].max_size) }}"
-    min_size: "{{ asg_min_size | default(asg.results[0].min_size) }}"
-    desired_capacity: "{{ asg_desired_capacity | default(asg.results[0].desired_capacity) }}"
-    health_check_type: "{{ asg_health_check_type | default(asg.results[0].health_check_type) }}"
-    health_check_period: "{{ asg_health_check_grace_period | default(asg.results[0].health_check_grace_period) }}"
-    replace_all_instances: true
-    replace_batch_size: "{{ asg_replace_batch_size | default(omit) }}"
-    wait_for_instances: "{{ asg_wait_for_instances }}"
-    wait_timeout: "{{ asg_wait_timeout }}"
-    tags: "{{ asg_tags }}"
-  when:
-    - canary_release_instance_ids|length <= 0
+# - name: Update full ASG
+#   ec2_asg:
+#     region: "{{ aws_region }}"
+#     default_cooldown: "{{ asg_default_cooldown }}"
+#     name: "{{ asg_name }}"
+#     launch_config_name: "{{ new_lc_name }}"
+#     max_size: "{{ asg_max_size | default(asg.results[0].max_size) }}"
+#     min_size: "{{ asg_min_size | default(asg.results[0].min_size) }}"
+#     desired_capacity: "{{ asg_desired_capacity | default(asg.results[0].desired_capacity) }}"
+#     health_check_type: "{{ asg_health_check_type | default(asg.results[0].health_check_type) }}"
+#     health_check_period: "{{ asg_health_check_grace_period | default(asg.results[0].health_check_grace_period) }}"
+#     replace_all_instances: true
+#     replace_batch_size: "{{ asg_replace_batch_size | default(omit) }}"
+#     wait_for_instances: "{{ asg_wait_for_instances }}"
+#     wait_timeout: "{{ asg_wait_timeout }}"
+#     tags: "{{ asg_tags }}"
+#   when:
+#     - canary_release_instance_ids|length <= 0
 
-- name: List of old Launch Configurations to be deleted
-  set_fact:
-    old_lc_to_delete: "{{ old_lc_to_delete | default([]) + [ item.name ] }}"
-  with_items: "{{ all_lc.results }}"
-  when:
-    - item.name != new_lc_name
-    - item.name is search("-" + launch_configuration_name_suffix + "$")
+# - name: List of old Launch Configurations to be deleted
+#   set_fact:
+#     old_lc_to_delete: "{{ old_lc_to_delete | default([]) + [ item.name ] }}"
+#   with_items: "{{ all_lc.results }}"
+#   when:
+#     - item.name != new_lc_name
+#     - item.name is search("-" + launch_configuration_name_suffix + "$")
 
-- name: List of to be deleted old Launch Configurations
-  debug:
-    msg: "{{ old_lc_to_delete }}"
-    verbosity: 3
-  when:
-    - old_lc_to_delete|length > 0
+# - name: List of to be deleted old Launch Configurations
+#   debug:
+#     msg: "{{ old_lc_to_delete }}"
+#     verbosity: 3
+#   when:
+#     - old_lc_to_delete|length > 0
 
-- name: Delete all the Old Launch Configuration
-  ec2_lc:
-    region: "{{ aws_region }}"
-    name: "{{ item }}"
-    state: absent
-  with_items: "{{ old_lc_to_delete }}"
-  when:
-    - old_lc_to_delete|length > 0
+# - name: Delete all the Old Launch Configuration
+#   ec2_lc:
+#     region: "{{ aws_region }}"
+#     name: "{{ item }}"
+#     state: absent
+#   with_items: "{{ old_lc_to_delete }}"
+#   when:
+#     - old_lc_to_delete|length > 0
 
