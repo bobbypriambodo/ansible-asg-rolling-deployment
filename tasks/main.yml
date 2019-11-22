@@ -108,9 +108,9 @@
 
 - name: Get canary instances
   ec2_instance_facts:
-  filters:
-    "tag:Name": "{{ asg_name }}"
-    "tag:Canary": "true"
+    filters:
+      "tag:Name": "{{ asg_name }}"
+      "tag:Canary": "true"
   register: canary_instances
 
 - name: Debug
